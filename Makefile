@@ -1,5 +1,8 @@
+CXX = clang++
+CXXFLAGS = -std=c++23 -Wall -W -Wextra -pedantic
+
 run:
 	@./bin/main
 
 build:
-	@clang++ -std=c++23 src/main.cc -o ./bin/main -Wall -W -Wextra -ansi -pedantic
+	$(CXX) $(CXXFLAGS) src/main.cc -o ./bin/main

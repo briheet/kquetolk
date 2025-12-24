@@ -3,4 +3,6 @@
 
 namespace tcp {};
 
+namespace kqueue {};
+
 #endif
