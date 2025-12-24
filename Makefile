@@ -6,3 +6,6 @@ run:
 
 build:
 	$(CXX) $(CXXFLAGS) src/main.cc -o ./bin/main
+
+flame:
+	@/Users/briheet/.cargo/bin/flamegraph -- bin/main
