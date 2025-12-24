@@ -1,8 +1,6 @@
-#ifndef KQUETOLK__INCLUDE__TCP
-#define KQUETOLK__INCLUDE__TCP
+#ifndef KQUETOLK_INCLUDE_TCP_H_
+#define KQUETOLK_INCLUDE_TCP_H_
 
 namespace tcp {};
-
-namespace kqueue {};
 
 #endif
