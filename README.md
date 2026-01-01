@@ -1,3 +1,3 @@
 # Kquetolk
 
-Implementation for talk via kqueue
+A Redis compatible in-memory server implementing with RESP protocol from socket scratch.
