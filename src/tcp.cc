@@ -61,30 +61,43 @@ std::vector<Tcp::Event> Tcp::poll_events() {
     auto &kev = events[i];
 
     if (kev.flags & EV_ERROR) {
-      out.push_back({(int)kev.ident, Event::Type::Error});
+      out.emplace_back(Event{
+          .fd = kev.ident,
+          .type = Event::Type::Error,
+      });
       continue;
     }
 
     if (kev.ident == (uintptr_t)listen_fd) {
-      out.push_back({listen_fd, Event::Type::Accept});
+      out.emplace_back(Event{
+          .fd = kev.ident,
+          .type = Event::Type::Accept,
+      });
       continue;
     }
 
     if (kev.flags & EV_EOF) {
-      out.push_back({(int)kev.ident, Event::Type::Close});
+      out.emplace_back(Event{
+          .fd = kev.ident,
+          .type = Event::Type::Close,
+      });
       continue;
     }
 
     if (kev.filter == EVFILT_READ) {
-      out.push_back({(int)kev.ident, Event::Type::Read});
+      out.emplace_back(Event{
+          .fd = kev.ident,
+          .type = Event::Type::Read,
+      });
+      continue;
     }
   }
 
   return out;
 }
 
-void Tcp::accept_connections() {
-  while (true) {
+void Tcp::accept_connections(const Event /*ev*/) {
+  for (;;) {
     int client_fd = accept(listen_fd, nullptr, nullptr);
     if (client_fd == -1) {
       if (errno == EAGAIN || errno == EWOULDBLOCK)
@@ -94,20 +107,46 @@ void Tcp::accept_connections() {
 
     make_nonblocking(client_fd);
 
+    // Add to map
+    Conn c;
+    c.fd = client_fd;
+    connections[client_fd] = std::move(c);
+
     struct kevent ev;
     EV_SET(&ev, client_fd, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, nullptr);
-    kevent(kqueue_fd, &ev, 1, nullptr, 0, nullptr);
+    if (kevent(kqueue_fd, &ev, 1, nullptr, 0, nullptr) == -1)
+      err(1, "kevent register client");
   }
 }
 
-void Tcp::handle_read(int fd) {
+void Tcp::handle_read(const Event &ev) {
+
+  auto it = connections.find(ev.fd);
+  if (it == connections.end()) {
+    close(ev.fd);
+    return;
+  }
+
+  Conn &c = it->second;
   char buf[1024];
 
-  ssize_t n = read(fd, buf, sizeof(buf));
-  if (n > 0) {
-    write(fd, buf, n);
+  for (;;) {
+    ssize_t n = read(ev.fd, buf, sizeof(buf));
+
+    if (n > 0) {
+      c.inbuf.append(buf, n);
+    } else if (n == 0) {
+      close(ev.fd);
+      connections.erase(it);
+      break;
+    } else {
+      if (errno == EAGAIN || errno == EWOULDBLOCK)
+        break;
+      close(ev.fd);
+      connections.erase(it);
+      break;
+    }
   }
-  return;
 }
 
 } // namespace tcp

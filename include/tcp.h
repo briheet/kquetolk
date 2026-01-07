@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <netinet/in.h>
 #include <sys/event.h>
+#include <unordered_map>
 #include <vector>
 
 namespace tcp {
@@ -13,16 +14,24 @@ public:
   struct Event {
     enum class Type { Accept, Read, Close, Error };
 
-    int fd;
+    uintptr_t fd;
     Type type;
+  };
+
+  struct Conn {
+    int fd;
+    std::string inbuf;
+    std::string outbuf;
   };
 
   Tcp();
   ~Tcp();
 
   std::vector<Event> poll_events();
-  void accept_connections();
-  void handle_read(int fd);
+  void accept_connections(const Event &);
+  void handle_read(const Event &ev);
+
+  std::unordered_map<int, Conn> connections;
 
 private:
   static constexpr std::uint32_t MAX_EVENTS = 128;
