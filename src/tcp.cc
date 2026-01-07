@@ -96,7 +96,7 @@ std::vector<Tcp::Event> Tcp::poll_events() {
   return out;
 }
 
-void Tcp::accept_connections(const Event /*ev*/) {
+void Tcp::accept_connections() {
   for (;;) {
     int client_fd = accept(listen_fd, nullptr, nullptr);
     if (client_fd == -1) {

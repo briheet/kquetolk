@@ -28,7 +28,7 @@ public:
   ~Tcp();
 
   std::vector<Event> poll_events();
-  void accept_connections(const Event &);
+  void accept_connections();
   void handle_read(const Event &ev);
 
   std::unordered_map<int, Conn> connections;
