@@ -1,4 +1,3 @@
-#include "../include/tcp.h"
 
 #include <cerrno>
 #include <cstring>
@@ -6,6 +5,8 @@
 #include <fcntl.h>
 #include <sys/event.h>
 #include <unistd.h>
+
+#include "../../include/tcp/tcp.hpp"
 
 namespace tcp {
 

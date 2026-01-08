@@ -1,4 +1,3 @@
-#include "../include/tcp.h"
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
@@ -11,55 +10,10 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-// Plan: Create a socket, give it a address and port, listen for connections,
-// accept client and send and recieve data
-
-constexpr const char *CRLF = "\r\n";
-
-// +OK\r\n
-struct SimpleString {
-  size_t length;
-  std::string data;
-};
-
-void reply_data(tcp::Tcp::Conn &conn,
-                const struct SimpleString &simple_string) {
-
-  conn.outbuf.append("+");
-  conn.outbuf.append(simple_string.data);
-  conn.outbuf.append("\r\n");
-}
-
-void handle_simple_string(tcp::Tcp::Conn &conn) {
-
-  auto &buf = conn.inbuf;
-
-  struct SimpleString simple_string;
-
-  //  "+\r\n"
-  if (buf.size() < 3)
-    return;
-
-  size_t crlf = buf.find(CRLF);
-  if (crlf == std::string::npos)
-    return;
-
-  simple_string.data = buf.substr(1, crlf - 1);
-  simple_string.length = simple_string.data.size();
-
-  // Consume frame
-  buf.erase(0, crlf + 2);
-
-  // Reply back
-  reply_data(conn, simple_string);
-}
+#include "../include/resp/simple_string.hpp"
+#include "../include/tcp/tcp.hpp"
 
 void parse_resp(tcp::Tcp::Conn &conn) {
-
-  // Parse it via bulk string for now
-  // https://redis.io/docs/latest/develop/reference/protocol-spec/#resp-protocol-description}
-
-  std::string delimiter = "\r\n";
 
   if (conn.inbuf.size() == 0)
     err(1, "empty inbuf");
@@ -67,7 +21,11 @@ void parse_resp(tcp::Tcp::Conn &conn) {
   switch (conn.inbuf[0]) {
   case '+':
     // Type simple string
-    handle_simple_string(conn);
+    SimpleString::SimpleString data;
+    if (data.read(conn) == 0) {
+      data.write(conn, data.data);
+      // data.clear(conn);
+    }
   }
 }
 

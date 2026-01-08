@@ -10,7 +10,7 @@ runapp:
 	$(BIN)/main
 
 buildapp:
-	$(CXX) $(CXXFLAGS) -I$(SRC_INCLUDE) src/main.cc src/tcp.cc -o ./bin/main
+	$(CXX) $(CXXFLAGS) -I$(SRC_INCLUDE) src/main.cc src/tcp/tcp.cc src/resp/simple_string.cc src/data_types/data_types.cc -o ./bin/main
 
 flame:
 	/Users/briheet/.cargo/bin/flamegraph -- $(BIN)/main
