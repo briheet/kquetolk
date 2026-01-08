@@ -12,7 +12,7 @@ namespace tcp {
 class Tcp {
 public:
   struct Event {
-    enum class Type { Accept, Read, Close, Error };
+    enum class Type { Accept, Read, Write, Close, Error };
 
     uintptr_t fd;
     Type type;
@@ -30,6 +30,8 @@ public:
   std::vector<Event> poll_events();
   void accept_connections();
   void handle_read(const Event &ev);
+  void enable_write(int fd);
+  void handle_write(const Event &ev);
 
   std::unordered_map<int, Conn> connections;
 

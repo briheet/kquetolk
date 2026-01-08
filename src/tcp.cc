@@ -4,6 +4,7 @@
 #include <cstring>
 #include <err.h>
 #include <fcntl.h>
+#include <sys/event.h>
 #include <unistd.h>
 
 namespace tcp {
@@ -91,6 +92,14 @@ std::vector<Tcp::Event> Tcp::poll_events() {
       });
       continue;
     }
+
+    if (kev.filter == EVFILT_WRITE) {
+      out.emplace_back(Event{
+          .fd = kev.ident,
+          .type = Event::Type::Write,
+      });
+      continue;
+    }
   }
 
   return out;
@@ -146,6 +155,45 @@ void Tcp::handle_read(const Event &ev) {
       connections.erase(it);
       break;
     }
+  }
+}
+
+void Tcp::enable_write(int fd) {
+  struct kevent ev;
+  EV_SET(&ev, fd, EVFILT_WRITE, EV_ADD | EV_ENABLE, 0, 0, nullptr);
+  kevent(kqueue_fd, &ev, 1, nullptr, 0, nullptr);
+}
+
+void Tcp::handle_write(const Event &ev) {
+
+  auto it = connections.find(ev.fd);
+
+  if (it == connections.end())
+    return;
+
+  Conn &conn = it->second;
+
+  if (conn.outbuf.empty())
+    return;
+
+  ssize_t n = write(conn.fd, conn.outbuf.data(), conn.outbuf.size());
+
+  if (n <= 0) {
+    if (errno == EAGAIN || errno == EWOULDBLOCK)
+      return;
+
+    close(ev.fd);
+    connections.erase(it);
+    return;
+  }
+
+  conn.outbuf.erase(0, n);
+
+  // Disable write notifications if done
+  if (conn.outbuf.empty()) {
+    struct kevent kev;
+    EV_SET(&kev, ev.fd, EVFILT_WRITE, EV_DELETE, 0, 0, nullptr);
+    kevent(kqueue_fd, &kev, 1, nullptr, 0, nullptr);
   }
 }
 

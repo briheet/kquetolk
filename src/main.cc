@@ -4,8 +4,8 @@
 #include <cstring>
 #include <err.h>
 #include <fcntl.h>
-#include <iostream>
 #include <netinet/in.h>
+#include <string>
 #include <sys/_types/_ssize_t.h>
 #include <sys/event.h>
 #include <sys/socket.h>
@@ -14,13 +14,21 @@
 // Plan: Create a socket, give it a address and port, listen for connections,
 // accept client and send and recieve data
 
+constexpr const char *CRLF = "\r\n";
+
 // +OK\r\n
 struct SimpleString {
   size_t length;
   std::string data;
 };
 
-constexpr const char *CRLF = "\r\n";
+void reply_data(tcp::Tcp::Conn &conn,
+                const struct SimpleString &simple_string) {
+
+  conn.outbuf.append("+");
+  conn.outbuf.append(simple_string.data);
+  conn.outbuf.append("\r\n");
+}
 
 void handle_simple_string(tcp::Tcp::Conn &conn) {
 
@@ -39,10 +47,11 @@ void handle_simple_string(tcp::Tcp::Conn &conn) {
   simple_string.data = buf.substr(1, crlf - 1);
   simple_string.length = simple_string.data.size();
 
-  std::cout << simple_string.data << '\n';
-
   // Consume frame
   buf.erase(0, crlf + 2);
+
+  // Reply back
+  reply_data(conn, simple_string);
 }
 
 void parse_resp(tcp::Tcp::Conn &conn) {
@@ -83,6 +92,11 @@ int main(void) {
       case tcp::Tcp::Event::Type::Read:
         server.handle_read(ev);
         parse_resp(server.connections[ev.fd]);
+        server.enable_write(ev.fd);
+        break;
+
+      case tcp::Tcp::Event::Type::Write:
+        server.handle_write(ev);
         break;
 
       case tcp::Tcp::Event::Type::Error:
