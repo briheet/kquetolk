@@ -10,6 +10,7 @@ public:
   virtual ~DataType();
 
   static constexpr const char *CRLF = "\r\n";
+  static constexpr size_t CRLF_LEN = 2;
 
   virtual int read(tcp::Tcp::Conn &conn) = 0;
   virtual int write(tcp::Tcp::Conn &conn, std::string data) = 0;

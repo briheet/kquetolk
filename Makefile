@@ -1,5 +1,5 @@
 CXX = clang++
-CXXFLAGS = -std=c++23 -Wall -W -Wextra -pedantic
+CXXFLAGS = -std=c++23 -g -Wall -W -Wextra -pedantic -fno-omit-frame-pointer
 SRC_INCLUDE = ./include
 SRC_LIB = ./src
 BENCH_INCLUDE = ../benchmark/include
@@ -10,7 +10,7 @@ runapp:
 	$(BIN)/main
 
 buildapp:
-	$(CXX) $(CXXFLAGS) -I$(SRC_INCLUDE) src/main.cc src/tcp/tcp.cc src/resp/simple_string.cc src/data_types/data_types.cc -o ./bin/main
+	$(CXX) $(CXXFLAGS) -I$(SRC_INCLUDE) src/main.cc src/tcp/tcp.cc src/resp/simple_string.cc src/resp/bulk_string.cc src/data_types/data_types.cc -o ./bin/main
 
 flame:
 	/Users/briheet/.cargo/bin/flamegraph -- $(BIN)/main

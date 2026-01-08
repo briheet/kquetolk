@@ -10,6 +10,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "../include/resp/bulk_string.hpp"
 #include "../include/resp/simple_string.hpp"
 #include "../include/tcp/tcp.hpp"
 
@@ -19,13 +20,22 @@ void parse_resp(tcp::Tcp::Conn &conn) {
     err(1, "empty inbuf");
 
   switch (conn.inbuf[0]) {
-  case '+':
-    // Type simple string
-    SimpleString::SimpleString data;
-    if (data.read(conn) == 0) {
-      data.write(conn, data.data);
-      // data.clear(conn);
+  case '+': {
+    SimpleString::SimpleString value;
+    if (value.read(conn) == 0) {
+      value.write(conn, value.data);
     }
+    break;
+  }
+  case '$': {
+    BulkString::BulkString value;
+    if (value.read(conn) == 0) {
+      value.write(conn, value.data);
+    }
+    break;
+  }
+  case '*': {
+  }
   }
 }
 
