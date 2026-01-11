@@ -8,7 +8,7 @@ import (
 
 func Execute(ctx context.Context) int {
 
-	rootCmd := cobra.Command{
+	rootCmd := &cobra.Command{
 		Use:   "kquetolk",
 		Short: "Kquetolk is a redis resp compatible server written in go.",
 		RunE: func(cmd *cobra.Command, args []string) error {

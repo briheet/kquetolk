@@ -1,19 +1,12 @@
 package client
 
 import (
-	"log"
 	"net"
+	"strings"
 	"sync"
 
 	"github.com/briheet/kquetolk/internal/resp"
 )
-
-type Conner interface {
-	HandleConnection() error
-	IsWriteable() bool
-	Close() error
-	Write() error
-}
 
 type Conn struct {
 	conn net.Conn
@@ -21,86 +14,84 @@ type Conn struct {
 	mu       sync.RWMutex
 	readBuf  []byte
 	writeBuf []byte
-
-	resp resp.Resp
 }
 
 func NewClientConnection(conn net.Conn) *Conn {
 	return &Conn{
 		conn:     conn,
-		readBuf:  make([]byte, 1024),
-		writeBuf: make([]byte, 1024),
-		resp:     resp.NewResp(),
+		readBuf:  make([]byte, 0, 4096),
+		writeBuf: make([]byte, 0, 4096),
 	}
 }
 
 func (c *Conn) HandleConnection() error {
-
-	readBuf := make([]byte, 1024)
+	tmp := make([]byte, 4096)
 
 	for {
-		n, err := c.conn.Read(readBuf)
+		n, err := c.conn.Read(tmp)
 		if err != nil {
 			return err
 		}
 
-		c.mu.Lock()
-		c.readBuf = append(c.readBuf, readBuf[:n]...)
+		c.readBuf = append(c.readBuf, tmp[:n]...)
 
 		for {
+			val, consumed, err := resp.Parse(c.readBuf)
 
-			out, consumed, err := c.resp.HandleParsing(&c.readBuf)
+			if err == resp.ErrIncomplete {
+				break
+			}
 			if err != nil {
-				c.mu.Unlock()
 				return err
 			}
 
-			if consumed == 0 {
-				break
-			}
-
 			c.readBuf = c.readBuf[consumed:]
-			c.writeBuf = append(c.writeBuf, out...)
+
+			reply := c.handleCommand(val)
+
+			c.writeBuf = append(c.writeBuf, reply...)
 		}
-		c.mu.Unlock()
 
 		if err := c.flush(); err != nil {
 			return err
 		}
 	}
+}
 
+func (c *Conn) handleCommand(v resp.Value) []byte {
+	if v.Type != '*' || len(v.Array) == 0 {
+		return resp.EncodeError("ERR invalid command")
+	}
+
+	cmd := strings.ToUpper(v.Array[0].Str)
+
+	switch cmd {
+	case "PING":
+		return resp.EncodeSimpleString("PONG")
+	case "ECHO":
+		if len(v.Array) != 2 {
+			return resp.EncodeError("ERR wrong number of arguments")
+		}
+		return resp.EncodeBulkString(v.Array[1].Str)
+	default:
+		return resp.EncodeError("ERR unknown command")
+	}
 }
 
 func (c *Conn) flush() error {
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	if len(c.writeBuf) == 0 {
 		return nil
 	}
-
-	// Write back to connection for now
-	if err := c.writeToTcp(); err != nil {
-		log.Printf("error writing to conn: %v", err)
-	}
-
-	return nil
-}
-
-func (c *Conn) Close() error {
-	defer c.conn.Close()
-	return nil
-}
-
-func (c *Conn) writeToTcp() error {
-
-	log.Println("reaching the write, dont worry")
 
 	_, err := c.conn.Write(c.writeBuf)
 	if err != nil {
 		return err
 	}
 
+	c.writeBuf = c.writeBuf[:0]
 	return nil
+}
+
+func (c *Conn) Close() {
+	defer c.conn.Close()
 }
