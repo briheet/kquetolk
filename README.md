@@ -11,6 +11,9 @@ make runapp # Run the application
 ```
 
 ```sh
-# To test Simple string
-{ echo -e '+OK\r\n'; sleep 1; } | nc localhost 6379
+redis-cli -p 6379 ping
+# -> PONG
+
+redis-cli -p 6379 echo hello
+# -> "hello"
 ```
