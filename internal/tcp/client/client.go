@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"errors"
 	"net"
 	"strings"
@@ -13,6 +14,12 @@ var (
 	ErrNilClient = errors.New("net.Conn is nil")
 )
 
+var dataPool = sync.Pool{
+	New: func() any {
+		return new(bytes.Buffer)
+	},
+}
+
 type Client interface {
 	HandleConnection() error
 	handleCommand(resp.Value) []byte
@@ -23,11 +30,10 @@ type Client interface {
 var _ Client = (*Conn)(nil)
 
 type Conn struct {
-	conn net.Conn
-
 	mu       sync.RWMutex
-	readBuf  []byte
 	writeBuf []byte
+	readBuf  []byte
+	conn     net.Conn
 }
 
 type options struct {
