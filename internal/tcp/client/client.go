@@ -1,12 +1,26 @@
 package client
 
 import (
+	"errors"
 	"net"
 	"strings"
 	"sync"
 
 	"github.com/briheet/kquetolk/internal/resp"
 )
+
+var (
+	ErrNilClient = errors.New("net.Conn is nil")
+)
+
+type Client interface {
+	HandleConnection() error
+	handleCommand(resp.Value) []byte
+	flush() error
+	Close()
+}
+
+var _ Client = (*Conn)(nil)
 
 type Conn struct {
 	conn net.Conn
@@ -16,12 +30,46 @@ type Conn struct {
 	writeBuf []byte
 }
 
-func NewClientConnection(conn net.Conn) *Conn {
+type options struct {
+	conn net.Conn
+}
+
+type Option interface {
+	apply(*options)
+}
+
+type clientConnOption struct {
+	conn net.Conn
+}
+
+func WithClientConn(conn net.Conn) Option {
+	return clientConnOption{conn: conn}
+}
+
+func (o clientConnOption) apply(opts *options) {
+	opts.conn = o.conn
+}
+
+func NewClientConnection(opts ...Option) (*Conn, error) {
+
+	// Default config
+	cfg := options{
+		conn: nil,
+	}
+
+	for _, opt := range opts {
+		opt.apply(&cfg)
+	}
+
+	if cfg.conn == nil {
+		return nil, ErrNilClient
+	}
+
 	return &Conn{
-		conn:     conn,
+		conn:     cfg.conn,
 		readBuf:  make([]byte, 0, 4096),
 		writeBuf: make([]byte, 0, 4096),
-	}
+	}, nil
 }
 
 func (c *Conn) HandleConnection() error {

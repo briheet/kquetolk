@@ -10,6 +10,43 @@ import (
 	"github.com/briheet/kquetolk/internal/tcp/client"
 )
 
+type Server interface {
+	Execute(context.Context) error
+	Start() error
+	Shutdown() error
+}
+
+var _ Server = (*TcpServer)(nil)
+
+type options struct {
+	host string
+	port string
+}
+
+type Option interface {
+	apply(*options)
+}
+
+type hostOption string
+
+func WithHost(host string) Option {
+	return hostOption(host)
+}
+
+func (h hostOption) apply(opts *options) {
+	opts.host = string(h)
+}
+
+type portOption string
+
+func WithPort(port string) Option {
+	return portOption(port)
+}
+
+func (p portOption) apply(opts *options) {
+	opts.port = string(p)
+}
+
 type TcpServer struct {
 	// Server specific stuff
 	addr    *net.TCPAddr
@@ -20,9 +57,21 @@ type TcpServer struct {
 	connections map[net.Conn]*client.Conn
 }
 
-func NewTcpServer(host, port string) (*TcpServer, error) {
+func NewTcpServer(opts ...Option) (*TcpServer, error) {
 
-	newtcpAddr, err := net.ResolveTCPAddr("tcp", host+":"+port)
+	// Defaults
+	cfg := options{
+		host: "localhost",
+		port: "6379",
+	}
+
+	for _, opt := range opts {
+		opt.apply(&cfg)
+	}
+
+	addr := net.JoinHostPort(cfg.host, cfg.port)
+
+	newtcpAddr, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
@@ -70,8 +119,16 @@ func (s *TcpServer) Start() error {
 			return err
 		}
 
-		clientConn := client.NewClientConnection(conn)
+		clientConn, err := client.NewClientConnection(
+			client.WithClientConn(conn),
+		)
+		if err != nil {
+			log.Println(err)
+		}
+
+		s.mu.Lock()
 		s.connections[conn] = clientConn
+		s.mu.Unlock()
 
 		go clientConn.HandleConnection()
 	}

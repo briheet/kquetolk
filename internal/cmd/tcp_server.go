@@ -8,8 +8,7 @@ import (
 )
 
 func TcpServerCmd(ctx context.Context) *cobra.Command {
-
-	tcpServerCmd := cobra.Command{
+	tcpServerCmd := &cobra.Command{
 		Use:   "tcpServer",
 		Short: "Tcp server redis resp compatible.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -18,7 +17,10 @@ func TcpServerCmd(ctx context.Context) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			// New tcp server obj
-			tcpServer, err := server.NewTcpServer("localhost", "6379")
+			tcpServer, err := server.NewTcpServer(
+				server.WithHost("localhost"),
+				server.WithPort("6379"),
+			)
 			if err != nil {
 				return err
 			}
@@ -30,5 +32,6 @@ func TcpServerCmd(ctx context.Context) *cobra.Command {
 			return nil
 		},
 	}
-	return &tcpServerCmd
+
+	return tcpServerCmd
 }
