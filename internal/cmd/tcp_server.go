@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 
+	"github.com/briheet/kquetolk/internal/storage"
 	"github.com/briheet/kquetolk/internal/tcp/server"
 	"github.com/spf13/cobra"
 )
@@ -16,10 +17,14 @@ func TcpServerCmd(ctx context.Context) *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 
+			// Initialize storage
+			store := storage.New()
+
 			// New tcp server obj
 			tcpServer, err := server.NewTcpServer(
 				server.WithHost("localhost"),
 				server.WithPort("6379"),
+				server.WithStorage(store),
 			)
 			if err != nil {
 				return err
@@ -29,6 +34,7 @@ func TcpServerCmd(ctx context.Context) *cobra.Command {
 				return err
 			}
 
+			store.Close()
 			return nil
 		},
 	}

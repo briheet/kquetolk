@@ -13,3 +13,7 @@ func EncodeError(s string) []byte {
 func EncodeBulkString(s string) []byte {
 	return []byte("$" + strconv.Itoa(len(s)) + "\r\n" + s + "\r\n")
 }
+
+func EncodeNullBulkString() []byte {
+	return []byte("$-1\r\n")
+}

@@ -7,6 +7,7 @@ import (
 	"net"
 	"sync"
 
+	"github.com/briheet/kquetolk/internal/storage"
 	"github.com/briheet/kquetolk/internal/tcp/client"
 )
 
@@ -19,8 +20,9 @@ type Server interface {
 var _ Server = (*TcpServer)(nil)
 
 type options struct {
-	host string
-	port string
+	host  string
+	port  string
+	store *storage.ShardedMap
 }
 
 type Option interface {
@@ -47,10 +49,25 @@ func (p portOption) apply(opts *options) {
 	opts.port = string(p)
 }
 
+type storageOption struct {
+	store *storage.ShardedMap
+}
+
+func WithStorage(store *storage.ShardedMap) Option {
+	return storageOption{store: store}
+}
+
+func (s storageOption) apply(opts *options) {
+	opts.store = s.store
+}
+
 type TcpServer struct {
 	// Server specific stuff
 	addr    *net.TCPAddr
 	Listner *net.TCPListener
+
+	// Storage
+	store *storage.ShardedMap
 
 	// To manage all connections
 	mu          sync.RWMutex
@@ -61,8 +78,9 @@ func NewTcpServer(opts ...Option) (*TcpServer, error) {
 
 	// Defaults
 	cfg := options{
-		host: "localhost",
-		port: "6379",
+		host:  "localhost",
+		port:  "6379",
+		store: nil,
 	}
 
 	for _, opt := range opts {
@@ -84,6 +102,7 @@ func NewTcpServer(opts ...Option) (*TcpServer, error) {
 	return &TcpServer{
 		addr:        newtcpAddr,
 		Listner:     newListener,
+		store:       cfg.store,
 		mu:          sync.RWMutex{},
 		connections: make(map[net.Conn]*client.Conn),
 	}, nil
@@ -121,16 +140,26 @@ func (s *TcpServer) Start() error {
 
 		clientConn, err := client.NewClientConnection(
 			client.WithClientConn(conn),
+			client.WithStorage(s.store),
 		)
 		if err != nil {
 			log.Println(err)
+			conn.Close()
+			continue
 		}
 
 		s.mu.Lock()
 		s.connections[conn] = clientConn
 		s.mu.Unlock()
 
-		go clientConn.HandleConnection()
+		go func(c net.Conn, cc *client.Conn) {
+			cc.HandleConnection()
+			cc.Close()
+
+			s.mu.Lock()
+			delete(s.connections, c)
+			s.mu.Unlock()
+		}(conn, clientConn)
 	}
 
 }

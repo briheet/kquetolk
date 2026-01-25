@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/briheet/kquetolk/internal/resp"
+	"github.com/briheet/kquetolk/internal/storage"
 )
 
 var (
@@ -34,10 +37,12 @@ type Conn struct {
 	writeBuf []byte
 	readBuf  []byte
 	conn     net.Conn
+	store    *storage.ShardedMap
 }
 
 type options struct {
-	conn net.Conn
+	conn  net.Conn
+	store *storage.ShardedMap
 }
 
 type Option interface {
@@ -56,11 +61,24 @@ func (o clientConnOption) apply(opts *options) {
 	opts.conn = o.conn
 }
 
+type storageOption struct {
+	store *storage.ShardedMap
+}
+
+func WithStorage(store *storage.ShardedMap) Option {
+	return storageOption{store: store}
+}
+
+func (o storageOption) apply(opts *options) {
+	opts.store = o.store
+}
+
 func NewClientConnection(opts ...Option) (*Conn, error) {
 
 	// Default config
 	cfg := options{
-		conn: nil,
+		conn:  nil,
+		store: nil,
 	}
 
 	for _, opt := range opts {
@@ -73,6 +91,7 @@ func NewClientConnection(opts ...Option) (*Conn, error) {
 
 	return &Conn{
 		conn:     cfg.conn,
+		store:    cfg.store,
 		readBuf:  make([]byte, 0, 4096),
 		writeBuf: make([]byte, 0, 4096),
 	}, nil
@@ -121,15 +140,81 @@ func (c *Conn) handleCommand(v resp.Value) []byte {
 
 	switch cmd {
 	case "PING":
-		return resp.EncodeSimpleString("PONG")
+		return c.handlePing()
 	case "ECHO":
-		if len(v.Array) != 2 {
-			return resp.EncodeError("ERR wrong number of arguments")
-		}
-		return resp.EncodeBulkString(v.Array[1].Str)
+		return c.handleEcho(v.Array)
+	case "SET":
+		return c.handleSet(v.Array[1:])
+	case "GET":
+		return c.handleGet(v.Array[1:])
 	default:
 		return resp.EncodeError("ERR unknown command")
 	}
+}
+
+func (c *Conn) handlePing() []byte {
+	return resp.EncodeSimpleString("PONG")
+}
+
+func (c *Conn) handleEcho(args []resp.Value) []byte {
+	if len(args) != 2 {
+		return resp.EncodeError("ERR wrong number of arguments")
+	}
+	return resp.EncodeBulkString(args[0].Str)
+}
+
+func (c *Conn) handleSet(args []resp.Value) []byte {
+	if len(args) < 2 {
+		return resp.EncodeError("ERR wrong number of arguments for 'set' command")
+	}
+
+	key := args[0].Str
+	value := []byte(args[1].Str)
+	var ttl time.Duration
+
+	// Parse optional arguments: EX seconds, PX milliseconds
+	for i := 2; i < len(args); i++ {
+		opt := strings.ToUpper(args[i].Str)
+		switch opt {
+		case "EX":
+			if i+1 >= len(args) {
+				return resp.EncodeError("ERR syntax error")
+			}
+			secs, err := strconv.Atoi(args[i+1].Str)
+			if err != nil {
+				return resp.EncodeError("ERR value is not an integer or out of range")
+			}
+			ttl = time.Duration(secs) * time.Second
+			i++
+		case "PX":
+			if i+1 >= len(args) {
+				return resp.EncodeError("ERR syntax error")
+			}
+			ms, err := strconv.Atoi(args[i+1].Str)
+			if err != nil {
+				return resp.EncodeError("ERR value is not an integer or out of range")
+			}
+			ttl = time.Duration(ms) * time.Millisecond
+			i++
+		}
+	}
+
+	c.store.Set(key, value, ttl)
+	return resp.EncodeSimpleString("OK")
+}
+
+func (c *Conn) handleGet(args []resp.Value) []byte {
+	if len(args) != 1 {
+		return resp.EncodeError("ERR wrong number of arguments for 'get' command")
+	}
+
+	key := args[0].Str
+	value, ok := c.store.Get(key)
+	if !ok {
+		return resp.EncodeNullBulkString()
+	}
+
+	return resp.EncodeBulkString(string(value))
 }
 
 func (c *Conn) flush() error {
