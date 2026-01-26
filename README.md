@@ -66,3 +66,23 @@ Benchmarked against `redis:latest` Docker image under identical conditions.
 - **1K connections**: Kquetolk is **46% faster** with 37% lower latency — goroutines handle moderate concurrency efficiently
 - **10K connections**: Redis is **23% faster** with better tail latency — its single-threaded event loop (epoll/kqueue) scales better at high connection counts
 - Goroutine-per-connection incurs overhead from context switching and lock contention at scale
+
+### Throughput Comparison
+
+![Throughput Comparison](benchmark/throughput_comparison.png)
+
+![Throughput Overlay](benchmark/throughput_overlay.png)
+
+### Generate Throughput Graph
+
+```bash
+# Run benchmarks at various client counts
+./benchmark/run_benchmark.sh 6379 kquetolk_results.csv
+
+# Optional: benchmark Redis for comparison
+docker run -d -p 6380:6379 redis:latest
+./benchmark/run_benchmark.sh 6380 redis_results.csv
+
+# Plot results (requires: pip3 install matplotlib)
+python3 benchmark/plot_benchmark.py kquetolk_results.csv [redis_results.csv]
+```
