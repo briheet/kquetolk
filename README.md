@@ -68,7 +68,14 @@ Benchmarked against `redis:latest` Docker image under identical conditions.
 - **10K connections**: Kquetolk is **9% faster** in throughput, though Redis has better tail latency
 - gnet's event-loop architecture (epoll/kqueue) efficiently handles high connection counts with minimal overhead
 
-### Throughput Comparison
+
+### Throughput Comparison (Gnet implementation)
+
+![Throughput Comparison](benchmark/throughput_comparison_gnet.png)
+
+![Throughput Overlay](benchmark/throughput_overlay_gnet.png)
+
+### Throughput Comparison (Old net package, per conn per goroutine model)
 
 ![Throughput Comparison](benchmark/throughput_comparison.png)
 
