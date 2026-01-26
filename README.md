@@ -69,28 +69,38 @@ Benchmarked against `redis:latest` Docker image under identical conditions.
 - gnet's event-loop architecture (epoll/kqueue) efficiently handles high connection counts with minimal overhead
 
 
-### Throughput Comparison (Gnet implementation)
+### Benchmark Visualizations (Gnet implementation)
 
 ![Throughput Comparison](benchmark/throughput_comparison_gnet.png)
 
 ![Throughput Overlay](benchmark/throughput_overlay_gnet.png)
 
-### Throughput Comparison (Old net package, per conn per goroutine model)
+![P99 Latency Comparison](benchmark/latency_p99_comparison_gnet.png)
+
+![Throughput vs Latency Tradeoff](benchmark/throughput_latency_tradeoff_gnet.png)
+
+![Kquetolk Latency Percentiles](benchmark/latency_percentiles_kquetolk_gnet.png)
+
+![Redis Latency Percentiles](benchmark/latency_percentiles_redis_gnet.png)
+
+### Benchmark Visualizations (Old net package, per conn per goroutine model)
 
 ![Throughput Comparison](benchmark/throughput_comparison.png)
 
 ![Throughput Overlay](benchmark/throughput_overlay.png)
 
-### Generate Throughput Graph
+### Generate Benchmark Graphs
 
 ```bash
-# Run benchmarks at various client counts
-./benchmark/run_benchmark.sh 6379 kquetolk_results.csv
+# Run benchmarks (uses memtier with 3 iterations for reliability)
+./benchmark/run_benchmark.sh 6379 benchmark/kquetolk_results.csv
 
 # Optional: benchmark Redis for comparison
 docker run -d -p 6380:6379 redis:latest
-./benchmark/run_benchmark.sh 6380 redis_results.csv
+./benchmark/run_benchmark.sh 6380 benchmark/redis_results.csv
 
-# Plot results (requires: pip3 install matplotlib)
-python3 benchmark/plot_benchmark.py kquetolk_results.csv [redis_results.csv]
+# Generate graphs (requires: pip3 install matplotlib)
+python3 benchmark/plot_benchmark.py benchmark/kquetolk_results.csv benchmark/redis_results.csv
 ```
+
+Generates: throughput comparison, P99 latency, latency percentiles (p50/p99/p99.9), and throughput-latency tradeoff curves.
